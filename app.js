@@ -8,11 +8,11 @@ class ToPlusEditor {
         this.currentStep = 1;
         this.totalSteps = 6;
         this.stepData = {
-            1: { name: '문장 간소화', desc: '복잡한 문장을 명확하고 간결하게 변환합니다.', api: 'GPT-4o' },
-            2: { name: '문법 교정', desc: '문법 오류를 자동으로 감지하고 수정합니다.', api: 'Gemini 3.0 Pro' },
-            3: { name: '어조 조정', desc: '문맥에 맞는 적절한 어조로 조정합니다.', api: 'Gemini 3.0 Pro' },
+            1: { name: '문장 간소화', desc: '복잡한 문장을 명확하고 간결하게 변환합니다.', api: 'Gemini 3.0 Pro' },
+            2: { name: '문법 교정', desc: '문법 오류를 자동으로 감지하고 수정합니다.', api: 'Claude 4.5 Sonnet' },
+            3: { name: '어조 조정', desc: '문맥에 맞는 적절한 어조로 조정합니다.', api: 'Claude 4.5 Sonnet' },
             4: { name: '스타일 교정', desc: '일관된 문체와 스타일을 적용합니다.', api: 'LanguageTool' },
-            5: { name: '민감성 검사', desc: '부적절한 내용이나 민감한 표현을 검사합니다.', api: 'GPT-4o' },
+            5: { name: '민감성 검사', desc: '부적절한 내용이나 민감한 표현을 검사합니다.', api: 'Gemini 3.0 Pro' },
             6: { name: '최종 검토', desc: '모든 단계를 거친 최종 결과를 검토합니다.', api: 'QuillBot' }
         };
         this.completedSteps = new Set();
