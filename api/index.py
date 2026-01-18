@@ -134,24 +134,45 @@ async def process_text(request: ProcessTextRequest):
     changes = []
 
     if step == 1: # 문장 간소화 (Gemini 3.0 Pro)
-        result = await call_gemini(text, "다음 문장을 더 간결하고 명확하게 수정하세요. 의미는 유지해야 합니다. 설명 없이 결과 텍스트만 출력하세요.")
+        prompt = """
+        You are an English textbook content expert with 30 years of experience.
+        Simplify the following sentences to make them clear and concise, suitable for high-quality educational material.
+        Keep the meaning 100% intact.
+        Output ONLY the simplified text without explanation.
+        """
+        result = await call_gemini(text, prompt)
         msg = "문장 간소화 (Gemini 3.0 Pro)"
 
     elif step == 2: # 문법 교정 (Hanspell -> Gemini Fallback)
         hanspell_res, hanspell_changes = call_hanspell(text)
         
-        if hanspell_res:
-            result = hanspell_res
-            changes = hanspell_changes
-            msg = "문법 교정 (Hanspell - Naver)"
+        # 입력 텍스트가 한글이 포함되어 있으면 Hanspell 우선 시도
+        is_korean = any(ord('가') <= ord(char) <= ord('힣') for char in text)
+        
+        if is_korean and hanspell_res:
+             result = hanspell_res
+             changes = hanspell_changes
+             msg = "문법 교정 (Hanspell - Naver)"
         else:
-            # Hanspell 실패 시 Gemini가 처리
-            prompt = "한국어 맞춤법과 띄어쓰기를 완벽하게 교정하세요. 부가 설명 없이 교정된 텍스트만 출력하세요."
+            # 영문이거나 Hanspell 실패 시 Gemini가 처리 (영어 교과서 전문가 페르소나)
+            prompt = """
+            You are an English editing expert with 30 years of experience in textbook publishing.
+            Perfectly correct the grammar, punctuation, and usage of the input text.
+            It must be flawless and adhere to standard English conventions.
+            Double-check for any subtle errors.
+            Output ONLY the corrected text without explanation.
+            """
             result = await call_gemini(text, prompt)
-            msg = "문법 교정 (Gemini 3.0 Pro - Fallback)"
+            msg = "문법 교정 (Gemini 3.0 Pro - Expert)"
 
     elif step == 3: # 어조 조정 (Gemini 3.0 Pro)
-        result = await call_gemini(text, "이 텍스트의 어조를 '격식 있고(Formal) 전문적인 어조'로 변경하세요. 설명 없이 변환된 텍스트만 출력하세요.")
+        prompt = """
+        You are an educational content creator for students (K-12).
+        Change the tone of this text to be 'Hopeful, Positive, and Encouraging'.
+        Make it inspiring and suitable for young learners while maintaining the educational value.
+        Output ONLY the transformed text without explanation.
+        """
+        result = await call_gemini(text, prompt)
         msg = "어조 조정 (Gemini 3.0 Pro)"
 
     elif step == 4: # 스타일 교정 (LanguageTool)
@@ -159,11 +180,18 @@ async def process_text(request: ProcessTextRequest):
         msg = "스타일 교정 (LanguageTool API)"
 
     elif step == 5: # 민감성 검사 (Gemini 3.0 Pro)
-        result = await call_gemini(text, "텍스트의 편향성, 혐오 표현, 민감한 내용을 검사하고 순화하세요. 문제 없으면 원문을 그대로 출력하세요. 설명 없이 텍스트만 출력하세요.")
+        prompt = "Review this text for bias, offensive language, or sensitive content based on educational publishing standards. Purify it if necessary. If safe, output the original text. Output ONLY the text."
+        result = await call_gemini(text, prompt)
         msg = "민감성 검사 (Gemini 3.0 Pro)"
 
     elif step == 6: # 최종 검토 (Gemini 3.0 Pro)
-        result = await call_gemini(text, "문장을 가장 자연스럽고 유려한 한국어로 다듬으세요(Paraphrasing). 의미 왜곡 없이 세련되게 만드세요. 설명 없이 결과만 출력하세요.")
+        prompt = """
+        You are a veteran English textbook editor (30+ years experience).
+        Paraphrase this text to make it sound as natural, fluent, and polished as a native speaker's writing in a high-quality textbook.
+        Ensure maximum readability and elegance.
+        Output ONLY the final text without explanation.
+        """
+        result = await call_gemini(text, prompt)
         msg = "최종 검토 (Gemini 3.0 Pro)"
 
     return ProcessTextResponse(result=result, step=step, message=msg, changes=changes)
