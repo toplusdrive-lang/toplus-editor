@@ -17,11 +17,11 @@ app.add_middleware(
 )
 
 # --- API 설정 ---
-# 모든 단계를 Gemini 3.0 Pro가 처리 (Step 4 LanguageTool 제외, 그러나 Fallback은 Gemini)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-pro:generateContent"
+# [수정됨] 3.0-pro -> 1.5-pro (안정적인 최신 API)
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
 
-# LanguageTool (Step 4 - 스타일 특화)
+# LanguageTool (Step 4)
 LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
 LANGUAGETOOL_API_KEY = os.getenv("LANGUAGETOOL_API_KEY")
 LANGUAGETOOL_URL = "https://api.languagetool.org/v2/check"
@@ -44,9 +44,8 @@ class ProcessTextRequest(BaseModel):
 # --- Gemini 도우미 함수 ---
 async def call_gemini(text: str, prompt: str):
     if not GEMINI_API_KEY:
-        return f"[Mock] API Key 오류. (입력: {text})"
+        return f"[Mock] API Key 오류. Vercel 환경 변수에 GEMINI_API_KEY를 설정해주세요. (입력: {text})"
     
-    # 강력한 시스템 지시사항 (사족 방지)
     system_instruction = """
     [SYSTEM]
     You are a strict text processing engine.
@@ -64,14 +63,17 @@ async def call_gemini(text: str, prompt: str):
                 f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
                 json={
                     "contents": [{"parts": [{"text": full_prompt}]}],
-                    "generationConfig": {"temperature": 0.1} # 정확도 중요
+                    "generationConfig": {"temperature": 0.1}
                 }
             )
             if response.status_code != 200:
-                raise Exception(f"Gemini Error: {response.text}")
+                # 에러 메시지 상세 출력
+                error_detail = response.text
+                return f"[Gemini Error {response.status_code}] {error_detail}"
+                
             return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
-            return f"[Gemini Error] {str(e)}"
+            return f"[Gemini Exception] {str(e)}"
 
 # --- LanguageTool 도우미 함수 ---
 async def call_languagetool(text: str):
@@ -100,7 +102,6 @@ async def process_text(request: ProcessTextRequest):
     msg = ""
     changes = []
     
-    # 언어 감지
     is_korean = any(ord('가') <= ord(char) <= ord('힣') for char in text)
 
     if step == 1: # 문장 간소화
@@ -113,9 +114,9 @@ async def process_text(request: ProcessTextRequest):
             Keep the meaning 100% intact. Output ONLY the simplified text.
             """
         result = await call_gemini(text, prompt)
-        msg = "문장 간소화 (Gemini 3.0 Pro)"
+        msg = "문장 간소화 (Gemini 1.5 Pro)"
 
-    elif step == 2: # 문법 교정 (Gemini Only)
+    elif step == 2: # 문법 교정
         if is_korean:
             prompt = """
             당신은 20년 경력의 한국어 교열 전문가입니다.
@@ -123,14 +124,14 @@ async def process_text(request: ProcessTextRequest):
             오타가 없어야 합니다. 반드시 3번 검토하세요.
             설명 없이 교정된 텍스트만 출력하세요.
             """
-            msg = "문법 교정 (Gemini 3.0 Pro - KR Expert)"
+            msg = "문법 교정 (Gemini 1.5 Pro - KR)"
         else:
             prompt = """
             You are an English editing expert with 30 years of experience.
             Perfectly correct the grammar and punctuation.
             It must be flawless. Output ONLY the corrected text without explanation.
             """
-            msg = "문법 교정 (Gemini 3.0 Pro - EN Expert)"
+            msg = "문법 교정 (Gemini 1.5 Pro - EN)"
         
         result = await call_gemini(text, prompt)
 
@@ -144,7 +145,7 @@ async def process_text(request: ProcessTextRequest):
             Make it inspiring for young learners. Output ONLY the text.
             """
         result = await call_gemini(text, prompt)
-        msg = "어조 조정 (Gemini 3.0 Pro)"
+        msg = "어조 조정 (Gemini 1.5 Pro)"
 
     elif step == 4: # 스타일 교정
         result = await call_languagetool(text)
@@ -153,7 +154,7 @@ async def process_text(request: ProcessTextRequest):
     elif step == 5: # 민감성 검사
         prompt = "Review this text for bias, offensive language, or sensitive content. Purify it if necessary. Output ONLY the text."
         result = await call_gemini(text, prompt)
-        msg = "민감성 검사 (Gemini 3.0 Pro)"
+        msg = "민감성 검사 (Gemini 1.5 Pro)"
 
     elif step == 6: # 최종 검토
         if is_korean:
@@ -165,6 +166,6 @@ async def process_text(request: ProcessTextRequest):
             Output ONLY the final text.
             """
         result = await call_gemini(text, prompt)
-        msg = "최종 검토 (Gemini 3.0 Pro)"
+        msg = "최종 검토 (Gemini 1.5 Pro)"
 
     return ProcessTextResponse(result=result, step=step, message=msg, changes=changes)
