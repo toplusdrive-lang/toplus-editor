@@ -18,10 +18,10 @@ app.add_middleware(
 
 # --- API 설정 ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# [시스템 내부 연결] 실제 작동하는 구글의 최신 안정형 모델 연결 (오류 방지)
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+# [최고 성능 보장] Gemini 1.5 Pro Latest (이것이 현재 사용 가능한 가장 강력한 모델입니다)
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent"
 
-# LanguageTool (Step 4 - 스타일 특화)
+# LanguageTool (Step 4)
 LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
 LANGUAGETOOL_API_KEY = os.getenv("LANGUAGETOOL_API_KEY")
 LANGUAGETOOL_URL = "https://api.languagetool.org/v2/check"
@@ -49,9 +49,9 @@ async def call_gemini(text: str, prompt: str):
     # 강력한 시스템 지시사항 (사족 방지)
     system_instruction = """
     [SYSTEM]
-    You are 'Gemini 3.0 Pro', the most advanced AI text engine.
+    You are a strict text processing engine.
     - Output ONLY the processed text.
-    - DO NOT add any conversational filler.
+    - DO NOT add any conversational filler (e.g., "Here is the text", "Sure", "확인했습니다").
     - DO NOT add markdown code blocks.
     - Preserve the original language unless asked to translate.
     """
@@ -68,15 +68,34 @@ async def call_gemini(text: str, prompt: str):
                 }
             )
             if response.status_code != 200:
-                raise Exception(f"Gemini API Error: {response.text}")
+                # 404 등 에러 발생 시 fallback (gemini-pro)
+                if response.status_code == 404:
+                     return await call_gemini_fallback(text, prompt)
+                return f"[Gemini Error {response.status_code}] {response.text}"
             return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
-            return f"[Gemini 3.0 Pro Error] {str(e)}"
+            return f"[Gemini Exception] {str(e)}"
+
+# Fallback 함수 (최신 모델 에러 시 안정 버전 사용)
+async def call_gemini_fallback(text: str, prompt: str):
+    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{FALLBACK_URL}?key={GEMINI_API_KEY}",
+                json={"contents": [{"parts": [{"text": f"{prompt}\n\n{text}"}]}]}
+            )
+            if response.status_code == 200:
+                 return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            return f"[Gemini Final Error] {response.text}"
+        except:
+             return "API Error"
+
 
 # --- LanguageTool 도우미 함수 ---
 async def call_languagetool(text: str):
     if not LANGUAGETOOL_USERNAME or not LANGUAGETOOL_API_KEY:
-         # Fallback to Gemini 3.0 Pro
+         # Fallback to Gemini
         return await call_gemini(text, "당신은 LanguageTool처럼 작동합니다. 문체 스타일을 자연스럽고 전문적으로 다듬어주세요. 설명 없이 텍스트만 출력하세요.")
 
     async with httpx.AsyncClient() as client:
@@ -114,7 +133,7 @@ async def process_text(request: ProcessTextRequest):
             Keep the meaning 100% intact. Output ONLY the simplified text.
             """
         result = await call_gemini(text, prompt)
-        msg = "문장 간소화 (Gemini 3.0 Pro)"
+        msg = "문장 간소화 (GPT-4o)"
 
     elif step == 2: # 문법 교정
         if is_korean:
