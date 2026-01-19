@@ -320,6 +320,33 @@ Output as JSON:
     )
 
 
+async def apply_logic_correction(text: str) -> Tuple[str, str]:
+    """
+    TOPLUS Logic Check Prototype
+    Analyzes logic gaps and infers missing particles/context.
+    """
+    prompt = """You are the 'TOPLUS Logic Editor'.
+    
+Step 1: Analyze logic. If the input is broken (e.g., "Look ants"), infer the missing particles based on standard English/Korean context (e.g., "Look [at the] ants").
+Step 2: Output the CORRECTED sentence only.
+Step 3: Provide a brief explanation of the 'Logical Gap' you filled.
+
+Output format:
+CORRECTED_TEXT: [sentence]
+LOGICAL_GAP: [explanation]"""
+    
+    result = await call_ai(prompt, text)
+    
+    # Parse result
+    text_match = re.search(r'CORRECTED_TEXT:\s*(.+?)(?=LOGICAL_GAP:|$)', result, re.DOTALL)
+    corrected = text_match.group(1).strip() if text_match else text
+    
+    gap_match = re.search(r'LOGICAL_GAP:\s*(.+)$', result, re.DOTALL)
+    gap_note = gap_match.group(1).strip() if gap_match else ""
+    
+    return corrected, gap_note
+
+
 # ============================================================
 # Main Workflow Engine
 # ============================================================
@@ -356,15 +383,21 @@ async def run_5step_workflow(text: str, text_type: TextType = TextType.TYPE_A) -
     ))
     current_text = simplified
     
-    # Step 3: 문장 재구성 (QuillBot/Wordtune)
+    # Step 3: 문맥/문장 검수 (Logic Check + Refinement)
+    # 1. Logic Correction
+    logic_corrected, gap_note = await apply_logic_correction(current_text)
+    
+    # 2. Tone Refinement
     if text_type == TextType.TYPE_A:
         # Formal: Use QuillBot standard
-        paraphrased = await simulate_quillbot(current_text, "standard")
-        tool = "QuillBot (Standard)"
+        paraphrased = await simulate_quillbot(logic_corrected, "standard")
+        tool = "Logic Check + QuillBot"
     else:
         # Casual: Use Wordtune casual
-        paraphrased = await simulate_wordtune(current_text, "casual_spices")
-        tool = "Wordtune (Casual+Spices)"
+        paraphrased = await simulate_wordtune(logic_corrected, "casual_spices")
+        tool = "Logic Check + Wordtune"
+    
+    step3_notes = f"Logic Gap: {gap_note}" if gap_note else ""
     
     results.append(ReviewResult(
         step=3,
@@ -372,7 +405,8 @@ async def run_5step_workflow(text: str, text_type: TextType = TextType.TYPE_A) -
         tool_used=tool,
         original_text=current_text,
         processed_text=paraphrased,
-        changes=[]
+        changes=[],
+        notes=step3_notes
     ))
     current_text = paraphrased
     
