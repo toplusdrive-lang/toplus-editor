@@ -18,8 +18,8 @@ app.add_middleware(
 
 # --- API 설정 ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# [2026년 최신] Gemini 2.0 Flash - 현재 가장 안정적인 모델
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+# [2026년 최신] Gemini 3.0 Flash - 최신 안정 버전
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent"
 
 # LanguageTool (Step 4)
 LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
@@ -78,7 +78,7 @@ async def call_gemini(text: str, prompt: str):
 
 # Fallback 함수 (최신 모델 에러 시 안정 버전 사용)
 async def call_gemini_fallback(text: str, prompt: str):
-    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent"
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.post(
