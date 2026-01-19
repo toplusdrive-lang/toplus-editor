@@ -17,9 +17,10 @@ app.add_middleware(
 )
 
 # --- API Keys (Optional - will use free alternatives if not set) ---
-TRINKA_API_KEY = os.getenv("TRINKA_API_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Support both uppercase and lowercase env var names
+TRINKA_API_KEY = os.getenv("TRINKA_API_KEY") or os.getenv("trinka_api_key")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or os.getenv("anthropic_api_key")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
 
 # --- API URLs ---
 TRINKA_URL = "https://api-platform.trinka.ai/api/v2/plugin/check/paragraph"
