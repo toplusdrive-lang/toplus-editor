@@ -226,6 +226,20 @@ async def status():
     }
 
 
+@app.get("/api/debug-env")
+async def debug_env():
+    """Debug endpoint to list all available environment keys (no values)"""
+    keys = list(os.environ.keys())
+    anthropic_keys = [k for k in keys if 'anthropic' in k.lower()]
+    return {
+        "all_keys_count": len(keys),
+        "anthropic_related_keys": anthropic_keys,
+        # Check specifically if our main key variable exists in env
+        "ANTHROPIC_API_KEY_EXISTS": "ANTHROPIC_API_KEY" in os.environ,
+        "anthropic_api_key_exists": "anthropic_api_key" in os.environ
+    }
+
+
 @app.post("/api/process-text")
 async def process_text(request: ProcessTextRequest):
     step = request.step
