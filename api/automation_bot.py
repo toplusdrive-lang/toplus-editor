@@ -169,6 +169,7 @@ async def simulate_hemingway(text: str) -> Tuple[str, int, str]:
 1. Calculate approximate grade level (1-12)
 2. Identify complex sentences
 3. Simplify if grade level > 6
+4. FOR KOREAN TEXT: Aggressively shorten sentences. Remove all redundant adjectives and adverbs. Make it direct.
 
 Output format:
 GRADE_LEVEL: [number]
@@ -194,7 +195,7 @@ async def simulate_quillbot(text: str, mode: str = "standard") -> str:
     """Simulate QuillBot - Paraphrasing"""
     mode_prompts = {
         "standard": "Paraphrase this text clearly and formally. Maintain all meaning.",
-        "simple": "Simplify this text for younger readers. Use shorter sentences and easier words.",
+        "simple": "Simplify this text significantly. For Korean, reduce length by 30-50% and use simple vocabulary. Split long sentences.",
         "formal": "Make this text more formal and academic.",
         "fluency": "Make this text more natural and fluent.",
         "freeze_words": "Paraphrase but keep key vocabulary words unchanged."

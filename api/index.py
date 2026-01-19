@@ -254,7 +254,7 @@ async def process_text(request: ProcessTextRequest):
 
     if step == 1:  # Sentence Simplification
         if is_korean:
-            prompt = "이 문장을 간결하고 명확하게 다듬으세요. 의미는 유지하세요."
+            prompt = "이 텍스트를 현재보다 확실히 짧게(50% 수준) 줄이고 간소화하세요. 불필요한 수식어를 모두 제거하고, 핵심 의미만 남겨서 간결한 문장으로 다시 쓰세요."
         else:
             prompt = "Simplify this text to be clear and concise. Keep the meaning intact."
         result, api_used = await process_with_ai(text, prompt)
