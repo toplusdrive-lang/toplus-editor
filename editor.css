@@ -250,3 +250,208 @@
 .btn-accent:hover:not(:disabled) {
     transform: translateY(-2px);
 }
+
+/* Auto Review Section */
+.auto-review-section {
+    margin-top: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(106, 13, 173, 0.1), rgba(255, 140, 0, 0.1));
+    border: 1px solid rgba(106, 13, 173, 0.3);
+    border-radius: 16px;
+}
+
+.auto-review-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.auto-review-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--brand-purple), var(--brand-orange));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.auto-review-header p {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.auto-review-options {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.option-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.option-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+}
+
+.select-control {
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    min-width: 160px;
+}
+
+.select-control:focus {
+    border-color: var(--brand-purple);
+}
+
+.auto-review-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.btn-diagnose {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-diagnose:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--brand-purple);
+}
+
+.btn-auto-review {
+    background: linear-gradient(135deg, #00C853, #009624);
+    color: white;
+    box-shadow: 0 4px 20px rgba(0, 200, 83, 0.4);
+    font-size: 16px;
+    padding: 16px 32px;
+}
+
+.btn-auto-review:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 200, 83, 0.5);
+}
+
+/* Workflow Progress */
+.workflow-progress {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+}
+
+.workflow-progress h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+.workflow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.workflow-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border-left: 4px solid var(--border-color);
+    transition: all 0.3s;
+}
+
+.workflow-step.active {
+    border-left-color: var(--brand-orange);
+    background: rgba(255, 140, 0, 0.1);
+}
+
+.workflow-step.completed {
+    border-left-color: #00C853;
+    background: rgba(0, 200, 83, 0.1);
+}
+
+.workflow-step-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.workflow-step.active .workflow-step-icon {
+    background: var(--brand-orange);
+    color: white;
+}
+
+.workflow-step.completed .workflow-step-icon {
+    background: #00C853;
+    color: white;
+}
+
+.workflow-step-info {
+    flex: 1;
+}
+
+.workflow-step-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.workflow-step-tool {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.workflow-step-status {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+.workflow-step.active .workflow-step-status {
+    background: var(--brand-orange);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.workflow-step.completed .workflow-step-status {
+    background: #00C853;
+    color: white;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}

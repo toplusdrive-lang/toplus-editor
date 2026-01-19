@@ -57,6 +57,14 @@ class ToPlusEditor {
         // Char counts
         this.charCount = document.querySelector('.char-count');
         this.outputCount = document.querySelector('.output-count');
+
+        // Auto Review elements
+        this.btnDiagnose = document.getElementById('btnDiagnose');
+        this.btnAutoReview = document.getElementById('btnAutoReview');
+        this.textTypeSelect = document.getElementById('textType');
+        this.targetGradeSelect = document.getElementById('targetGrade');
+        this.workflowProgress = document.getElementById('workflowProgress');
+        this.workflowSteps = document.getElementById('workflowSteps');
     }
 
     bindEvents() {
@@ -88,6 +96,14 @@ class ToPlusEditor {
 
         // Reset button
         this.btnReset.addEventListener('click', () => this.reset());
+
+        // Auto Review buttons
+        if (this.btnDiagnose) {
+            this.btnDiagnose.addEventListener('click', () => this.diagnoseText());
+        }
+        if (this.btnAutoReview) {
+            this.btnAutoReview.addEventListener('click', () => this.runAutoReview());
+        }
     }
 
     goToStep(step) {
@@ -321,6 +337,195 @@ class ToPlusEditor {
         `;
         this.updateUI();
         this.addLog('시스템이 초기화되었습니다.');
+    }
+
+    // ============================================================
+    // TOPLUS Automation Bot Methods
+    // ============================================================
+
+    async diagnoseText() {
+        const text = this.inputText.value.trim();
+        if (!text) {
+            this.addLog('텍스트를 입력해주세요.', 'error');
+            alert('텍스트를 입력해주세요.');
+            return;
+        }
+
+        this.showLoading(true);
+        this.addLog('🔍 텍스트 진단 시작...');
+
+        try {
+            const response = await fetch('/api/diagnose', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Display diagnosis result
+            const caseNames = {
+                'too_difficult': '🔴 Case A: 학년 대비 너무 어려움',
+                'too_formal': '🟠 Case B: 어조가 너무 딱딱함',
+                'context_awkward': '🟡 Case C: 문맥이 어색함',
+                'mechanical_error': '🔵 Case D: 기계적 오류 의심',
+                'normal': '🟢 정상'
+            };
+
+            const caseName = caseNames[data.case] || data.case;
+
+            this.outputText.innerHTML = `
+                <div class="result-text diagnosis-result">
+                    <h3>📋 진단 결과</h3>
+                    <p><strong>케이스:</strong> ${caseName}</p>
+                    <p><strong>지문 유형:</strong> ${data.text_type === 'formal' ? '지문 A (정숙성)' : '지문 B (생동감)'}</p>
+                    <p><strong>학년 수준:</strong> ${data.grade_level}</p>
+                    <p><strong>가독성 점수:</strong> ${data.readability_score}%</p>
+                    <p><strong>발견된 이슈:</strong></p>
+                    <ul>
+                        ${data.issues_found.map(i => `<li>${i}</li>`).join('') || '<li>없음</li>'}
+                    </ul>
+                    <p><strong>권장 워크플로우:</strong></p>
+                    <ol>
+                        ${data.recommended_workflow.map(w => `<li>${w}</li>`).join('')}
+                    </ol>
+                </div>
+            `;
+
+            this.addLog(`진단 완료: ${caseName}`, 'success');
+
+        } catch (error) {
+            this.addLog(`진단 오류: ${error.message}`, 'error');
+            alert(`진단 오류: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async runAutoReview() {
+        const text = this.inputText.value.trim();
+        if (!text) {
+            this.addLog('텍스트를 입력해주세요.', 'error');
+            alert('텍스트를 입력해주세요.');
+            return;
+        }
+
+        const textType = this.textTypeSelect?.value || 'A';
+        const targetGrade = this.targetGradeSelect?.value || 'M1';
+
+        this.showLoading(true);
+        this.addLog('🚀 5단계 자동 검수 시작...');
+
+        // Show workflow progress
+        if (this.workflowProgress) {
+            this.workflowProgress.style.display = 'block';
+            this.workflowSteps.innerHTML = `
+                <div class="workflow-step active" data-step="1">
+                    <div class="workflow-step-icon">1</div>
+                    <div class="workflow-step-info">
+                        <div class="workflow-step-name">오류 제거</div>
+                        <div class="workflow-step-tool">LanguageTool</div>
+                    </div>
+                    <div class="workflow-step-status">진행중</div>
+                </div>
+                <div class="workflow-step" data-step="2">
+                    <div class="workflow-step-icon">2</div>
+                    <div class="workflow-step-info">
+                        <div class="workflow-step-name">레벨링 진단</div>
+                        <div class="workflow-step-tool">Hemingway</div>
+                    </div>
+                    <div class="workflow-step-status">대기</div>
+                </div>
+                <div class="workflow-step" data-step="3">
+                    <div class="workflow-step-icon">3</div>
+                    <div class="workflow-step-info">
+                        <div class="workflow-step-name">문장 재구성</div>
+                        <div class="workflow-step-tool">${textType === 'A' ? 'QuillBot' : 'Wordtune'}</div>
+                    </div>
+                    <div class="workflow-step-status">대기</div>
+                </div>
+                <div class="workflow-step" data-step="4">
+                    <div class="workflow-step-icon">4</div>
+                    <div class="workflow-step-info">
+                        <div class="workflow-step-name">스타일 통일</div>
+                        <div class="workflow-step-tool">ProWritingAid</div>
+                    </div>
+                    <div class="workflow-step-status">대기</div>
+                </div>
+                <div class="workflow-step" data-step="5">
+                    <div class="workflow-step-icon">5</div>
+                    <div class="workflow-step-info">
+                        <div class="workflow-step-name">재검수</div>
+                        <div class="workflow-step-tool">13-Point Check</div>
+                    </div>
+                    <div class="workflow-step-status">대기</div>
+                </div>
+            `;
+        }
+
+        try {
+            const response = await fetch('/api/auto-review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text,
+                    text_type: textType,
+                    target_grade: targetGrade
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Auto review failed');
+            }
+
+            // Update workflow progress to show all completed
+            if (this.workflowSteps) {
+                const steps = this.workflowSteps.querySelectorAll('.workflow-step');
+                steps.forEach(step => {
+                    step.classList.remove('active');
+                    step.classList.add('completed');
+                    step.querySelector('.workflow-step-status').textContent = '완료';
+                });
+            }
+
+            // Display final result
+            this.outputText.innerHTML = `
+                <div class="result-text">
+                    <h3>✅ 5단계 자동 검수 완료!</h3>
+                    <hr style="border-color: rgba(255,255,255,0.1); margin: 16px 0;">
+                    <p><strong>최종 결과:</strong></p>
+                    <div style="padding: 16px; background: rgba(0,200,83,0.1); border-radius: 8px; margin-top: 12px;">
+                        ${data.final_text}
+                    </div>
+                    <hr style="border-color: rgba(255,255,255,0.1); margin: 16px 0;">
+                    <p><strong>처리 단계:</strong></p>
+                    ${data.steps.map(s => `
+                        <div style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                            <strong>Step ${s.step}: ${s.step_name}</strong> (${s.tool_used})
+                            ${s.notes ? `<br><small style="color: #888;">${s.notes}</small>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            if (this.outputCount) {
+                this.outputCount.textContent = `${data.final_text.length.toLocaleString()} 자`;
+            }
+
+            this.addLog('🎉 5단계 자동 검수 완료!', 'success');
+
+        } catch (error) {
+            this.addLog(`자동 검수 오류: ${error.message}`, 'error');
+            alert(`자동 검수 오류: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
     }
 }
 

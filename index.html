@@ -218,6 +218,72 @@
                         </svg>
                     </button>
                 </div>
+
+                <!-- 자동 검수 섹션 -->
+                <div class="auto-review-section">
+                    <div class="auto-review-header">
+                        <h3>🤖 자동 검수 (TOPLUS Bot)</h3>
+                        <p>5단계 자동 워크플로우로 텍스트를 완벽하게 검수합니다</p>
+                    </div>
+                    <div class="auto-review-options">
+                        <div class="option-group">
+                            <label for="textType">지문 유형</label>
+                            <select id="textType" class="select-control">
+                                <option value="A">지문 A (정숙성/명료성)</option>
+                                <option value="B">지문 B (생동감/이목)</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label for="targetGrade">대상 학년</label>
+                            <select id="targetGrade" class="select-control">
+                                <option value="E3">초등 3학년</option>
+                                <option value="E4">초등 4학년</option>
+                                <option value="E5">초등 5학년</option>
+                                <option value="E6">초등 6학년</option>
+                                <option value="M1" selected>중학 1학년</option>
+                                <option value="M2">중학 2학년</option>
+                                <option value="M3">중학 3학년</option>
+                                <option value="H1">고등 1학년</option>
+                                <option value="H2">고등 2학년</option>
+                                <option value="H3">고등 3학년</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="auto-review-actions">
+                        <button class="btn btn-diagnose" id="btnDiagnose">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.3-4.3"></path>
+                            </svg>
+                            진단하기
+                        </button>
+                        <button class="btn btn-auto-review" id="btnAutoReview">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M12 2v4"></path>
+                                <path d="m16.2 7.8 2.9-2.9"></path>
+                                <path d="M18 12h4"></path>
+                                <path d="m16.2 16.2 2.9 2.9"></path>
+                                <path d="M12 18v4"></path>
+                                <path d="m4.9 19.1 2.9-2.9"></path>
+                                <path d="M2 12h4"></path>
+                                <path d="m4.9 4.9 2.9 2.9"></path>
+                            </svg>
+                            🚀 5단계 자동 검수 시작
+                        </button>
+                    </div>
+
+                    <!-- 진행 상황 표시 -->
+                    <div class="workflow-progress" id="workflowProgress" style="display: none;">
+                        <h4>워크플로우 진행 상황</h4>
+                        <div class="workflow-steps" id="workflowSteps">
+                            <!-- 동적으로 추가됨 -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
