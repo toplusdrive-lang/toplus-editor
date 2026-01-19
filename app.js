@@ -227,6 +227,16 @@ class ToPlusEditor {
             // Add suggestions from API response
             this.addSuggestions(data.changes);
 
+            // 히스토리에 저장
+            this.addToHistory({
+                type: `Step ${this.currentStep}: ${this.stepData[this.currentStep].name}`,
+                originalText: text,
+                resultText: data.result,
+                toolsUsed: data.api_used || this.stepData[this.currentStep].api,
+                changes: (data.changes || []).map(c => `${c.original} → ${c.corrected}`),
+                step: this.currentStep
+            });
+
             this.addLog(`Step ${this.currentStep} 처리 완료!`, 'success');
             this.updateUI();
 
