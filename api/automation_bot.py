@@ -197,7 +197,7 @@ SIMPLIFIED_TEXT: [the improved text]"""
 async def simulate_quillbot(text: str, mode: str = "standard") -> str:
     """Simulate QuillBot - Paraphrasing"""
     mode_prompts = {
-        "standard": "Paraphrase this text clearly. Fix any logical errors or awkward phrasing.",
+        "standard": "Paraphrase this text clearly. Fix any logical errors. FOR KOREAN: Use formal, standard written style (문어체). Remove ambiguity.",
         "simple": "Simplify this text. For Korean, reduce length by 30-50%. Ensure the result makes logical sense.",
         "formal": "Make this text more formal and academic. Ensure logical flow.",
         "fluency": "Make this text more natural and fluent. Fix non-native phrasing.",
@@ -214,7 +214,10 @@ async def simulate_wordtune(text: str, style: str = "casual") -> str:
         "casual": "Rewrite this text in a casual, friendly tone. Like talking to a friend.",
         "formal": "Rewrite this text in a formal, professional tone.",
         "engaging": "Rewrite this text to be more engaging and dynamic. Add energy!",
-        "casual_spices": "Rewrite in casual tone with more personality and flair. Make it fun!"
+        "casual_spices": """Rewrite this text to be lively, fun, and engaging.
+1. FOR KOREAN: Use a friendly, enthusiastic tone (polite '해요' style). Add emotion and vitality to the sentences.
+2. Make it sound like a popular blog post or storyteller.
+3. Don't be stiff. Be creative!"""
     }
     
     prompt = style_prompts.get(style, style_prompts["casual"])
