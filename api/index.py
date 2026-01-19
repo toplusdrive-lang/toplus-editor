@@ -252,42 +252,40 @@ async def process_text(request: ProcessTextRequest):
     # Detect language
     is_korean = any(ord('가') <= ord(char) <= ord('힣') for char in text)
 
-    if step == 1:  # Sentence Simplification
-        if is_korean:
-            prompt = "이 텍스트를 현재보다 확실히 짧게(50% 수준) 줄이고 간소화하세요. 불필요한 수식어를 모두 제거하고, 핵심 의미만 남겨서 간결한 문장으로 다시 쓰세요."
-        else:
-            prompt = "Simplify this text to be clear and concise. Keep the meaning intact."
-        result, api_used = await process_with_ai(text, prompt)
-        msg = "문장 간소화"
-
-    elif step == 2:  # Grammar Correction
+    if step == 1:  # 오류 제거 (LanguageTool)
         result, api_used = await process_grammar(text)
-        msg = "문법 교정"
+        msg = "오류 제거"
 
-    elif step == 3:  # Tone Adjustment
+    elif step == 2:  # 레벨링 진단 (Hemingway)
+        prompt = """Analyze this text like the Hemingway Editor and simplify it:
+1. FOR KOREAN TEXT: Aggressively shorten sentences. Remove all redundant adjectives and adverbs. Make it direct.
+2. Reduce grade level to middle school level.
+3. Output ONLY the simplified text."""
+        result, api_used = await process_with_ai(text, prompt)
+        msg = "레벨링 진단"
+
+    elif step == 3:  # 문장 재구성 (QuillBot/Wordtune)
         if is_korean:
-            prompt = "이 텍스트를 희망차고 긍정적인 어조로 바꾸세요. 존댓말을 사용하세요."
+            prompt = "이 텍스트를 더 자연스럽고 매끄럽게 재구성하세요. (QuillBot Standard Mode). 한국어 문법에 맞게 문장 구조를 개선하세요."
         else:
-            prompt = "Change the tone to be hopeful, positive, and encouraging."
+            prompt = "Paraphrase this text clearly and formally. Maintain all meaning. (QuillBot Standard)"
         result, api_used = await process_with_ai(text, prompt)
-        msg = "어조 조정"
+        msg = "문장 재구성"
 
-    elif step == 4:  # Style Correction
-        result, api_used = await process_grammar(text)
-        msg = "스타일 교정"
-
-    elif step == 5:  # Sensitivity Check
-        prompt = "Review this text for bias or sensitive content. Correct if needed."
+    elif step == 4:  # 스타일 통일 (ProWritingAid)
+        prompt = """Improve the style of this text (ProWritingAid):
+1. Ensure consistent tone.
+2. Improve sentence variety.
+3. Fix logical flow issues.
+4. Output ONLY the improved text."""
         result, api_used = await process_with_ai(text, prompt)
-        msg = "민감성 검사"
+        msg = "스타일 통일"
 
-    elif step == 6:  # Final Review
-        if is_korean:
-            prompt = "문장을 자연스럽고 유려한 한국어로 다듬으세요."
-        else:
-            prompt = "Paraphrase this text to sound natural and fluent."
+    elif step == 5:  # 재검수 (13-Point Check)
+        prompt = """Final review based on 13-point checklist (Grammar, Spelling, Tone, Flow, etc).
+Correct any remaining issues and output ONLY the final polished text."""
         result, api_used = await process_with_ai(text, prompt)
-        msg = "최종 검토"
+        msg = "재검수"
 
     return ProcessTextResponse(
         result=result,

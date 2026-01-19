@@ -6,14 +6,13 @@
 class ToPlusEditor {
     constructor() {
         this.currentStep = 1;
-        this.totalSteps = 6;
+        this.totalSteps = 5;
         this.stepData = {
-            1: { name: '문장 간소화', desc: '복잡한 문장을 명확하고 간결하게 변환합니다.', api: 'Gemini 3.0 Pro' },
-            2: { name: '문법 교정', desc: '문법 오류를 자동으로 감지하고 수정합니다.', api: 'Claude 4.5 Sonnet' },
-            3: { name: '어조 조정', desc: '문맥에 맞는 적절한 어조로 조정합니다.', api: 'Claude 4.5 Sonnet' },
-            4: { name: '스타일 교정', desc: '일관된 문체와 스타일을 적용합니다.', api: 'LanguageTool' },
-            5: { name: '민감성 검사', desc: '부적절한 내용이나 민감한 표현을 검사합니다.', api: 'Gemini 3.0 Pro' },
-            6: { name: '최종 검토', desc: '모든 단계를 거친 최종 결과를 검토합니다.', api: 'QuillBot' }
+            1: { name: '오류 제거', desc: '기본적인 문법 및 맞춤법 오류를 제거합니다.', api: 'LanguageTool' },
+            2: { name: '레벨링 진단', desc: '학년 수준을 진단하고 난이도를 조정합니다.', api: 'Hemingway Editor' },
+            3: { name: '문장 재구성', desc: '문장을 더 자연스럽고 매끄럽게 재구성합니다.', api: 'QuillBot / Wordtune' },
+            4: { name: '스타일 통일', desc: '문체와 스타일을 일관성 있게 통일합니다.', api: 'ProWritingAid' },
+            5: { name: '재검수', desc: '13가지 체크포인트를 기준으로 최종 점검합니다.', api: '13-Point Check' }
         };
         this.completedSteps = new Set();
 
