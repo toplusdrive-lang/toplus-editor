@@ -520,3 +520,52 @@ async def recycling(request: RecyclingCheckRequest):
         return {"success": True, **result}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ============================================================
+# HISTORY STORAGE
+# ============================================================
+
+# In-memory storage (will be reset on server restart)
+# For production, use a database like Supabase, MongoDB, or file storage
+review_history_log = []
+
+
+class HistoryRecord(BaseModel):
+    id: int
+    timestamp: str
+    date: str
+    time: str
+    type: str
+    originalText: str
+    resultText: str
+    toolsUsed: str = ""
+    changes: List[str] = []
+    textType: str = ""
+    targetGrade: str = ""
+
+
+@app.post("/api/save-history")
+async def save_history(record: HistoryRecord):
+    """Save review history to server (for future database integration)"""
+    try:
+        # Add to in-memory log
+        review_history_log.append(record.dict())
+        
+        # Keep only last 1000 records in memory
+        while len(review_history_log) > 1000:
+            review_history_log.pop(0)
+        
+        return {"success": True, "message": "History saved", "total": len(review_history_log)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/history")
+async def get_history(limit: int = 50):
+    """Get recent review history"""
+    return {
+        "success": True,
+        "total": len(review_history_log),
+        "records": review_history_log[-limit:][::-1]  # Most recent first
+    }

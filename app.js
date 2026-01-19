@@ -16,6 +16,10 @@ class ToPlusEditor {
             6: { name: '최종 검토', desc: '모든 단계를 거친 최종 결과를 검토합니다.', api: 'QuillBot' }
         };
         this.completedSteps = new Set();
+
+        // Review History - Load from LocalStorage
+        this.reviewHistory = this.loadHistoryFromStorage();
+
         this.init();
     }
 
@@ -518,6 +522,18 @@ class ToPlusEditor {
                 this.outputCount.textContent = `${data.final_text.length.toLocaleString()} 자`;
             }
 
+            // 히스토리에 저장
+            this.addToHistory({
+                type: '5단계 자동 검수',
+                originalText: text,
+                resultText: data.final_text,
+                toolsUsed: data.steps.map(s => s.tool_used).join(' → '),
+                changes: data.steps.map(s => `${s.step_name}: ${s.notes || '완료'}`),
+                textType: textType,
+                targetGrade: targetGrade,
+                steps: data.steps
+            });
+
             this.addLog('🎉 5단계 자동 검수 완료!', 'success');
 
         } catch (error) {
@@ -525,6 +541,189 @@ class ToPlusEditor {
             alert(`자동 검수 오류: ${error.message}`);
         } finally {
             this.showLoading(false);
+        }
+    }
+
+    // ============================================================
+    // REVIEW HISTORY MANAGEMENT
+    // ============================================================
+
+    loadHistoryFromStorage() {
+        try {
+            const saved = localStorage.getItem('toplus_review_history');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.error('Failed to load history:', e);
+            return [];
+        }
+    }
+
+    saveHistoryToStorage() {
+        try {
+            localStorage.setItem('toplus_review_history', JSON.stringify(this.reviewHistory));
+        } catch (e) {
+            console.error('Failed to save history:', e);
+        }
+    }
+
+    addToHistory(record) {
+        const historyEntry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            date: new Date().toLocaleDateString('ko-KR'),
+            time: new Date().toLocaleTimeString('ko-KR'),
+            ...record
+        };
+
+        this.reviewHistory.unshift(historyEntry); // 최신 항목이 맨 앞
+
+        // 최대 100개까지만 저장
+        if (this.reviewHistory.length > 100) {
+            this.reviewHistory = this.reviewHistory.slice(0, 100);
+        }
+
+        this.saveHistoryToStorage();
+        this.addLog(`📝 히스토리 저장됨 (총 ${this.reviewHistory.length}개)`, 'success');
+
+        // 서버에도 저장 시도 (비동기)
+        this.saveToServer(historyEntry);
+
+        return historyEntry;
+    }
+
+    async saveToServer(record) {
+        try {
+            await fetch('/api/save-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(record)
+            });
+        } catch (e) {
+            // 서버 저장 실패해도 로컬에는 저장됨
+            console.log('Server save skipped:', e.message);
+        }
+    }
+
+    exportToJSON() {
+        const data = JSON.stringify(this.reviewHistory, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `toplus_history_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+        this.addLog('📥 JSON 파일 다운로드 완료', 'success');
+    }
+
+    exportToCSV() {
+        if (this.reviewHistory.length === 0) {
+            alert('저장된 히스토리가 없습니다.');
+            return;
+        }
+
+        const headers = ['날짜', '시간', '유형', '원본 텍스트', '결과 텍스트', '사용된 도구', '변경 사항'];
+        const rows = this.reviewHistory.map(h => [
+            h.date || '',
+            h.time || '',
+            h.type || '',
+            `"${(h.originalText || '').replace(/"/g, '""')}"`,
+            `"${(h.resultText || '').replace(/"/g, '""')}"`,
+            h.toolsUsed || '',
+            `"${(h.changes || []).join('; ').replace(/"/g, '""')}"`
+        ]);
+
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const BOM = '\uFEFF'; // 한글 깨짐 방지
+        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `toplus_history_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+        this.addLog('📥 CSV 파일 다운로드 완료', 'success');
+    }
+
+    showHistoryModal() {
+        // 모달이 이미 있으면 제거
+        const existing = document.getElementById('historyModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'historyModal';
+        modal.className = 'history-modal';
+        modal.innerHTML = `
+            <div class="history-modal-content">
+                <div class="history-modal-header">
+                    <h2>📋 검수 히스토리</h2>
+                    <div class="history-modal-actions">
+                        <button class="btn btn-small" onclick="app.exportToJSON()">📥 JSON</button>
+                        <button class="btn btn-small" onclick="app.exportToCSV()">📥 CSV</button>
+                        <button class="btn btn-small btn-danger" onclick="app.clearHistory()">🗑️ 전체 삭제</button>
+                        <button class="btn btn-small" onclick="document.getElementById('historyModal').remove()">✕ 닫기</button>
+                    </div>
+                </div>
+                <div class="history-list">
+                    ${this.reviewHistory.length === 0 ?
+                '<div class="empty-history">저장된 히스토리가 없습니다.</div>' :
+                this.reviewHistory.map(h => `
+                            <div class="history-item" data-id="${h.id}">
+                                <div class="history-item-header">
+                                    <span class="history-date">${h.date} ${h.time}</span>
+                                    <span class="history-type">${h.type || '검수'}</span>
+                                </div>
+                                <div class="history-item-body">
+                                    <div class="history-text-pair">
+                                        <div class="history-original">
+                                            <strong>원본:</strong>
+                                            <p>${(h.originalText || '').substring(0, 200)}${(h.originalText || '').length > 200 ? '...' : ''}</p>
+                                        </div>
+                                        <div class="history-arrow">→</div>
+                                        <div class="history-result">
+                                            <strong>결과:</strong>
+                                            <p>${(h.resultText || '').substring(0, 200)}${(h.resultText || '').length > 200 ? '...' : ''}</p>
+                                        </div>
+                                    </div>
+                                    ${h.toolsUsed ? `<div class="history-tools">🔧 ${h.toolsUsed}</div>` : ''}
+                                    ${h.changes && h.changes.length > 0 ? `
+                                        <div class="history-changes">
+                                            <strong>변경 사항:</strong>
+                                            <ul>${h.changes.slice(0, 5).map(c => `<li>${c}</li>`).join('')}</ul>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')
+            }
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 모달 배경 클릭 시 닫기
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    clearHistory() {
+        if (confirm('정말 모든 히스토리를 삭제하시겠습니까?')) {
+            this.reviewHistory = [];
+            this.saveHistoryToStorage();
+            this.addLog('🗑️ 히스토리가 삭제되었습니다.');
+
+            // 모달 새로고침
+            const modal = document.getElementById('historyModal');
+            if (modal) {
+                modal.remove();
+                this.showHistoryModal();
+            }
         }
     }
 }
