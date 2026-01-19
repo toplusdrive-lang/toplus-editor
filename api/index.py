@@ -281,3 +281,128 @@ async def process_text(request: ProcessTextRequest):
         changes=changes,
         api_used=api_used
     )
+
+
+# ============================================================
+# AUTOMATION BOT Endpoints (TOPLUS Review Protocol)
+# ============================================================
+
+from api.automation_bot import (
+    diagnose_text, run_5step_workflow, run_case_workflow,
+    recycling_check, ScenarioCase, TextType, ReviewResult
+)
+
+
+class AutoReviewRequest(BaseModel):
+    text: str
+    text_type: str = "A"  # A = formal, B = casual
+    target_grade: str = "M1"
+
+
+class DiagnoseRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/diagnose")
+async def diagnose(request: DiagnoseRequest):
+    """Diagnose text to determine case and recommended workflow"""
+    try:
+        result = await diagnose_text(request.text)
+        return {
+            "case": result.case.value,
+            "text_type": result.text_type.value,
+            "grade_level": result.grade_level,
+            "readability_score": result.readability_score,
+            "issues_found": result.issues_found,
+            "recommended_workflow": result.recommended_workflow
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/auto-review")
+async def auto_review(request: AutoReviewRequest):
+    """Run full 5-step automated review workflow"""
+    try:
+        text_type = TextType.TYPE_A if request.text_type == "A" else TextType.TYPE_B
+        results = await run_5step_workflow(request.text, text_type)
+        
+        # Convert results to JSON-serializable format
+        steps = []
+        for r in results:
+            steps.append({
+                "step": r.step,
+                "step_name": r.step_name,
+                "tool_used": r.tool_used,
+                "original_text": r.original_text,
+                "processed_text": r.processed_text,
+                "changes": r.changes,
+                "score": r.score,
+                "notes": r.notes
+            })
+        
+        return {
+            "success": True,
+            "steps": steps,
+            "final_text": results[-1].processed_text if results else request.text
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+class CaseWorkflowRequest(BaseModel):
+    text: str
+    case: str  # "CASE_A", "CASE_B", "CASE_C", "CASE_D"
+
+
+@app.post("/api/case-workflow")
+async def case_workflow(request: CaseWorkflowRequest):
+    """Run scenario-specific workflow"""
+    try:
+        case_mapping = {
+            "CASE_A": ScenarioCase.CASE_A,
+            "CASE_B": ScenarioCase.CASE_B,
+            "CASE_C": ScenarioCase.CASE_C,
+            "CASE_D": ScenarioCase.CASE_D,
+            "NORMAL": ScenarioCase.NORMAL
+        }
+        case = case_mapping.get(request.case, ScenarioCase.NORMAL)
+        
+        results = await run_case_workflow(request.text, case)
+        
+        steps = []
+        for r in results:
+            steps.append({
+                "step": r.step,
+                "step_name": r.step_name,
+                "tool_used": r.tool_used,
+                "original_text": r.original_text,
+                "processed_text": r.processed_text,
+                "changes": r.changes,
+                "score": r.score,
+                "notes": r.notes
+            })
+        
+        return {
+            "success": True,
+            "case": request.case,
+            "steps": steps,
+            "final_text": results[-1].processed_text if results else request.text
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+class RecyclingCheckRequest(BaseModel):
+    text: str
+    target_grade: str = "M1"
+
+
+@app.post("/api/recycling-check")
+async def recycling(request: RecyclingCheckRequest):
+    """Check if text needs recycling to different grade level"""
+    try:
+        result = await recycling_check(request.text, request.target_grade)
+        return {"success": True, **result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
