@@ -17,9 +17,10 @@ app.add_middleware(
 )
 
 # --- API 설정 ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# [2026년 최신] Gemini 3.0 Flash - 최신 안정 버전
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent"
+# [2026년 최신] Claude Sonnet 4.5 - Anthropic API
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 
 # LanguageTool (Step 4)
 LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
@@ -41,62 +42,48 @@ class ProcessTextRequest(BaseModel):
     text: str
     step: int
 
-# --- Gemini 도우미 함수 ---
-async def call_gemini(text: str, prompt: str):
-    if not GEMINI_API_KEY:
-        return f"[Mock] API Key 오류. (입력: {text})"
+# --- Claude 도우미 함수 ---
+async def call_claude(text: str, prompt: str):
+    if not ANTHROPIC_API_KEY:
+        return f"[오류] ANTHROPIC_API_KEY가 설정되지 않았습니다."
     
-    # 강력한 시스템 지시사항 (사족 방지)
-    system_instruction = """
-    [SYSTEM]
-    You are a strict text processing engine.
-    - Output ONLY the processed text.
-    - DO NOT add any conversational filler (e.g., "Here is the text", "Sure", "확인했습니다").
-    - DO NOT add markdown code blocks.
-    - Preserve the original language unless asked to translate.
-    """
+    # 시스템 지시사항 (사족 방지)
+    system_instruction = """You are a strict text processing engine.
+- Output ONLY the processed text.
+- DO NOT add any conversational filler (e.g., "Here is the text", "Sure", "확인했습니다").
+- DO NOT add markdown code blocks.
+- Preserve the original language unless asked to translate."""
     
-    full_prompt = f"{system_instruction}\n\n[INSTRUCTION]\n{prompt}\n\n[INPUT TEXT]\n{text}"
+    user_message = f"{prompt}\n\n[INPUT TEXT]\n{text}"
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             response = await client.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+                ANTHROPIC_API_URL,
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
                 json={
-                    "contents": [{"parts": [{"text": full_prompt}]}],
-                    "generationConfig": {"temperature": 0.1}
+                    "model": CLAUDE_MODEL,
+                    "max_tokens": 4096,
+                    "system": system_instruction,
+                    "messages": [{"role": "user", "content": user_message}]
                 }
             )
             if response.status_code != 200:
-                # 404 등 에러 발생 시 fallback (gemini-pro)
-                if response.status_code == 404:
-                     return await call_gemini_fallback(text, prompt)
-                return f"[Gemini Error {response.status_code}] {response.text}"
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return f"[Claude Error {response.status_code}] {response.text}"
+            return response.json()["content"][0]["text"].strip()
         except Exception as e:
-            return f"[Gemini Exception] {str(e)}"
-
-# Fallback 함수 (최신 모델 에러 시 안정 버전 사용)
-async def call_gemini_fallback(text: str, prompt: str):
-    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.post(
-                f"{FALLBACK_URL}?key={GEMINI_API_KEY}",
-                json={"contents": [{"parts": [{"text": f"{prompt}\n\n{text}"}]}]}
-            )
-            if response.status_code == 200:
-                 return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            return f"[Gemini Final Error] {response.text}"
-        except:
-             return "API Error"
+            return f"[Claude Exception] {str(e)}"
 
 
 # --- LanguageTool 도우미 함수 ---
 async def call_languagetool(text: str):
     if not LANGUAGETOOL_USERNAME or not LANGUAGETOOL_API_KEY:
          # Fallback to Gemini
-        return await call_gemini(text, "당신은 LanguageTool처럼 작동합니다. 문체 스타일을 자연스럽고 전문적으로 다듬어주세요. 설명 없이 텍스트만 출력하세요.")
+        return await call_claude(text, "당신은 LanguageTool처럼 작동합니다. 문체 스타일을 자연스럽고 전문적으로 다듬어주세요. 설명 없이 텍스트만 출력하세요.")
 
     async with httpx.AsyncClient() as client:
         try:
@@ -108,7 +95,7 @@ async def call_languagetool(text: str):
                  raise Exception("LT API Error")
             return f"[LT API Verified] {text}"
         except Exception:
-            return await call_gemini(text, "문체 스타일을 교정해주세요. 설명 없이 텍스트만 출력하세요.")
+            return await call_claude(text, "문체 스타일을 교정해주세요. 설명 없이 텍스트만 출력하세요.")
 
 
 # --- 메인 라우터 ---
@@ -132,7 +119,7 @@ async def process_text(request: ProcessTextRequest):
             Simplify the following sentences to make them clear and concise.
             Keep the meaning 100% intact. Output ONLY the simplified text.
             """
-        result = await call_gemini(text, prompt)
+        result = await call_claude(text, prompt)
         msg = "문장 간소화 (GPT-4o)"
 
     elif step == 2: # 문법 교정
@@ -152,7 +139,7 @@ async def process_text(request: ProcessTextRequest):
             """
             msg = "문법 교정 (Claude 4.5 Sonnet)"
         
-        result = await call_gemini(text, prompt)
+        result = await call_claude(text, prompt)
 
     elif step == 3: # 어조 조정
         if is_korean:
@@ -163,7 +150,7 @@ async def process_text(request: ProcessTextRequest):
             Change the tone to be 'Hopeful, Positive, and Encouraging'.
             Make it inspiring for young learners. Output ONLY the text.
             """
-        result = await call_gemini(text, prompt)
+        result = await call_claude(text, prompt)
         msg = "어조 조정 (Claude 4.5 Sonnet)"
 
     elif step == 4: # 스타일 교정
@@ -172,7 +159,7 @@ async def process_text(request: ProcessTextRequest):
 
     elif step == 5: # 민감성 검사
         prompt = "Review this text for bias, offensive language, or sensitive content. Purify it if necessary. Output ONLY the text."
-        result = await call_gemini(text, prompt)
+        result = await call_claude(text, prompt)
         msg = "민감성 검사 (Gemini 3.0 Pro)"
 
     elif step == 6: # 최종 검토
@@ -184,7 +171,7 @@ async def process_text(request: ProcessTextRequest):
             Paraphrase this text to make it sound as natural and fluent as a native speaker's writing.
             Output ONLY the final text.
             """
-        result = await call_gemini(text, prompt)
+        result = await call_claude(text, prompt)
         msg = "최종 검토 (QuillBot)"
 
     return ProcessTextResponse(result=result, step=step, message=msg, changes=changes)
