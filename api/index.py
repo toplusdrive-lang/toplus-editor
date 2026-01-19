@@ -287,7 +287,7 @@ async def process_text(request: ProcessTextRequest):
 # AUTOMATION BOT Endpoints (TOPLUS Review Protocol)
 # ============================================================
 
-from api.automation_bot import (
+from automation_bot import (
     diagnose_text, run_5step_workflow, run_case_workflow,
     recycling_check, ScenarioCase, TextType, ReviewResult
 )
