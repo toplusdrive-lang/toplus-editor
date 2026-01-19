@@ -78,7 +78,7 @@ async def call_gemini(text: str, prompt: str):
 
 # Fallback 함수 (최신 모델 에러 시 안정 버전 사용)
 async def call_gemini_fallback(text: str, prompt: str):
-    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    FALLBACK_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.post(
