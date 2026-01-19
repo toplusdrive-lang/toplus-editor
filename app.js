@@ -251,7 +251,17 @@ class ToPlusEditor {
     // Mock functions removed (simulateProcessing, generateMockResult)
 
     displayResult(result) {
-        this.outputText.innerHTML = `<div class="result-text">${result}</div>`;
+        // 결과 텍스트를 전역 변수나 속성에 저장해두면 좋겠지만, 여기서는 심플하게 DOM 조작
+        // Copy logic: get the text content of the result-content div only
+        const copyLogic = "navigator.clipboard.writeText(this.parentElement.querySelector('.result-content').innerText).then(() => alert('결과가 복사되었습니다!'))";
+
+        this.outputText.innerHTML = `
+            <div class="result-wrapper" style="position: relative;">
+                <div class="result-content">${result}</div>
+                <button onclick="${copyLogic}" style="position: absolute; top: 0; right: 0; padding: 4px 8px; font-size: 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; opacity: 0.8;">📋 복사</button>
+            </div>
+        `;
+
         if (this.outputCount) {
             this.outputCount.textContent = `${result.length.toLocaleString()} 자`;
         }
@@ -697,13 +707,22 @@ class ToPlusEditor {
                                         </div>
                                         <div class="history-arrow">→</div>
                                         <div class="history-result">
-                                            <strong>결과:</strong>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <strong>결과 (자동 적용됨):</strong>
+                                                <button class="btn btn-small" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent); alert('복사되었습니다!')" style="padding: 2px 6px; font-size: 11px;">📋 복사</button>
+                                            </div>
                                             <p>${(h.resultText || '').substring(0, 200)}${(h.resultText || '').length > 200 ? '...' : ''}</p>
                                         </div>
                                     </div>
 
                                     <div class="history-diff-view">
-                                        <h4>🔍 상세 비교 (교정 표식)</h4>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                            <h4>🔍 상세 비교 (수정 전/후)</h4>
+                                            <div style="font-size: 11px; color: var(--text-tertiary);">
+                                                <span class="diff-del">삭제됨(취소선)</span> 
+                                                <span class="diff-add">추가됨(초록색)</span>
+                                            </div>
+                                        </div>
                                         <div class="diff-content">${diffHtml}</div>
                                     </div>
 
