@@ -72,10 +72,12 @@ class DiagnosisResult:
 async def call_ai(prompt: str, text: str) -> str:
     """Call available AI API (Claude first, then Gemini)"""
     
-    system = """You are a strict text processing engine for educational content.
-- Output ONLY the processed text.
-- DO NOT add explanations or conversational filler.
-- Preserve meaning while improving quality."""
+    system = """You are a strict text editing engine for educational content.
+CRITICAL RULES:
+1. Output ONLY the processed text. No polite introductions or explanations.
+2. CONTEXT IS KING: Ensure the result makes logical sense. Do not produce sentences that are grammatically correct but semantically nonsense.
+3. If the input is broken or nonsensical, fix it to be meaningful based on context.
+4. Preserve the core meaning absolutely while improving clarity."""
     
     # Try Claude first
     if ANTHROPIC_API_KEY:
@@ -170,6 +172,7 @@ async def simulate_hemingway(text: str) -> Tuple[str, int, str]:
 2. Identify complex sentences
 3. Simplify if grade level > 6
 4. FOR KOREAN TEXT: Aggressively shorten sentences. Remove all redundant adjectives and adverbs. Make it direct.
+5. LOGIC CHECK: Ensure the simplified text makes sense. If the original text was broken (e.g. "Look ants"), correct it to be grammatical (e.g. "Look at the ants").
 
 Output format:
 GRADE_LEVEL: [number]
@@ -194,10 +197,10 @@ SIMPLIFIED_TEXT: [the improved text]"""
 async def simulate_quillbot(text: str, mode: str = "standard") -> str:
     """Simulate QuillBot - Paraphrasing"""
     mode_prompts = {
-        "standard": "Paraphrase this text clearly and formally. Maintain all meaning.",
-        "simple": "Simplify this text significantly. For Korean, reduce length by 30-50% and use simple vocabulary. Split long sentences.",
-        "formal": "Make this text more formal and academic.",
-        "fluency": "Make this text more natural and fluent.",
+        "standard": "Paraphrase this text clearly. Fix any logical errors or awkward phrasing.",
+        "simple": "Simplify this text. For Korean, reduce length by 30-50%. Ensure the result makes logical sense.",
+        "formal": "Make this text more formal and academic. Ensure logical flow.",
+        "fluency": "Make this text more natural and fluent. Fix non-native phrasing.",
         "freeze_words": "Paraphrase but keep key vocabulary words unchanged."
     }
     
