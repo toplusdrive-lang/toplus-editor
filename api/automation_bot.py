@@ -72,12 +72,13 @@ class DiagnosisResult:
 async def call_ai(prompt: str, text: str) -> str:
     """Call available AI API (Claude first, then Gemini)"""
     
-    system = """You are a strict text editing engine for educational content.
+    system = """You are a perfectionist editor for educational content.
 CRITICAL RULES:
-1. Output ONLY the processed text. No polite introductions or explanations.
-2. CONTEXT IS KING: Ensure the result makes logical sense. Do not produce sentences that are grammatically correct but semantically nonsense.
-3. If the input is broken or nonsensical, fix it to be meaningful based on context.
-4. Preserve the core meaning absolutely while improving clarity."""
+1. Output ONLY the processed text.
+2. BE EXTREMELY STRICT. Do not let any awkward phrasing pass.
+3. CONTEXT IS KING: Ensure logical consistency.
+4. If a sentence is 'okay' but could be better, IMPROVE IT. Do not just keep it.
+5. Fix broken input (e.g. "Look ants") to be grammatically and logically perfect."""
     
     # Try Claude first
     if ANTHROPIC_API_KEY:
@@ -226,11 +227,12 @@ async def simulate_wordtune(text: str, style: str = "casual") -> str:
 
 async def simulate_prowritingaid(text: str) -> Tuple[str, List[str]]:
     """Simulate ProWritingAid - Deep style analysis"""
-    prompt = """Analyze and improve this text like ProWritingAid:
+    prompt = """Analyze and improve this text like ProWritingAid (Strict Mode):
 1. Check for style consistency
 2. Identify logical flow issues
 3. Check sensitivity/bias
 4. Improve sentence variety
+5. STRICTLY flag repetitive words, weak verbs, and passive voice.
 
 Output format:
 ISSUES: [comma-separated list of issues found]
@@ -440,7 +442,8 @@ async def run_5step_workflow(text: str, text_type: TextType = TextType.TYPE_A) -
 
 async def run_13point_check(text: str) -> Tuple[str, str]:
     """Run the 13-point review checklist"""
-    prompt = """Review this text against our 13-point checklist:
+    prompt = """Review this text against our 13-point checklist with EXTREME SCRUTINY.
+Do not be generous. Find every small issue.
 
 1. Grammar accuracy
 2. Spelling
@@ -456,7 +459,8 @@ async def run_13point_check(text: str) -> Tuple[str, str]:
 12. Engagement level
 13. Educational value
 
-For each point, mark ✅ if pass or ❌ if needs work.
+For each point, mark ✅ if PERFECT, otherwise ❌ and fix it.
+CRITICAL: Even if the text seems fine, look for ways to make it more professional and polished. Do not settle for "good enough".
 Then provide the final corrected text.
 
 Output format:
