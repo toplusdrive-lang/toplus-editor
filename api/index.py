@@ -16,162 +16,268 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- API 설정 ---
-# [2026년 최신] Claude Sonnet 4.5 - Anthropic API
+# --- API Keys (Optional - will use free alternatives if not set) ---
+TRINKA_API_KEY = os.getenv("TRINKA_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# LanguageTool (Step 4)
-LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
-LANGUAGETOOL_API_KEY = os.getenv("LANGUAGETOOL_API_KEY")
-LANGUAGETOOL_URL = "https://api.languagetool.org/v2/check"
+# --- API URLs ---
+TRINKA_URL = "https://api-platform.trinka.ai/api/v2/plugin/check/paragraph"
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+LANGUAGETOOL_URL = "https://api.languagetool.org/v2/check"  # FREE - no key needed!
+
 
 class ChangeItem(BaseModel):
     original: str
     corrected: str
     reason: str
 
+
 class ProcessTextResponse(BaseModel):
     result: str
     step: int
     message: str
     changes: Optional[List[ChangeItem]] = []
+    api_used: str = ""
+
 
 class ProcessTextRequest(BaseModel):
     text: str
     step: int
 
-# --- Claude 도우미 함수 ---
-async def call_claude(text: str, prompt: str):
-    if not ANTHROPIC_API_KEY:
-        return f"[오류] ANTHROPIC_API_KEY가 설정되지 않았습니다."
+
+# ============================================================
+# API Helper Functions (with smart fallbacks)
+# ============================================================
+
+async def call_languagetool_free(text: str) -> tuple[str, str]:
+    """FREE LanguageTool API - No API key required!"""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                LANGUAGETOOL_URL,
+                data={
+                    "text": text,
+                    "language": "auto",  # Auto-detect language
+                    "enabledOnly": "false"
+                }
+            )
+            if response.status_code == 200:
+                data = response.json()
+                matches = data.get("matches", [])
+                
+                if not matches:
+                    return text, "LanguageTool (Free)"
+                
+                # Apply corrections
+                corrected = text
+                offset_adjustment = 0
+                
+                for match in sorted(matches, key=lambda x: x["offset"]):
+                    if match.get("replacements"):
+                        replacement = match["replacements"][0]["value"]
+                        start = match["offset"] + offset_adjustment
+                        end = start + match["length"]
+                        corrected = corrected[:start] + replacement + corrected[end:]
+                        offset_adjustment += len(replacement) - match["length"]
+                
+                return corrected, "LanguageTool (Free)"
+            else:
+                raise Exception(f"HTTP {response.status_code}")
+        except Exception as e:
+            return None, f"LanguageTool Error: {str(e)}"
+
+
+async def call_trinka(text: str) -> tuple[str, str]:
+    """Trinka API - Requires API key"""
+    if not TRINKA_API_KEY:
+        return None, "No Trinka API key"
     
-    # 시스템 지시사항 (사족 방지)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                TRINKA_URL,
+                headers={
+                    "Authorization": f"Bearer {TRINKA_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "paragraph": text,
+                    "language": "US"
+                }
+            )
+            if response.status_code == 200:
+                data = response.json()
+                # Process Trinka response and return corrected text
+                corrected = data.get("corrected_text", text)
+                return corrected, "Trinka AI"
+            else:
+                raise Exception(f"HTTP {response.status_code}")
+        except Exception as e:
+            return None, f"Trinka Error: {str(e)}"
+
+
+async def call_claude(text: str, prompt: str) -> tuple[str, str]:
+    """Claude API - Requires API key"""
+    if not ANTHROPIC_API_KEY:
+        return None, "No Claude API key"
+    
     system_instruction = """You are a strict text processing engine.
 - Output ONLY the processed text.
-- DO NOT add any conversational filler (e.g., "Here is the text", "Sure", "확인했습니다").
+- DO NOT add any conversational filler.
 - DO NOT add markdown code blocks.
-- Preserve the original language unless asked to translate."""
+- Preserve the original language."""
     
-    user_message = f"{prompt}\n\n[INPUT TEXT]\n{text}"
-
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             response = await client.post(
-                ANTHROPIC_API_URL,
+                ANTHROPIC_URL,
                 headers={
                     "x-api-key": ANTHROPIC_API_KEY,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json"
                 },
                 json={
-                    "model": CLAUDE_MODEL,
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 4096,
                     "system": system_instruction,
-                    "messages": [{"role": "user", "content": user_message}]
+                    "messages": [{"role": "user", "content": f"{prompt}\n\n{text}"}]
                 }
             )
-            if response.status_code != 200:
-                return f"[Claude Error {response.status_code}] {response.text}"
-            return response.json()["content"][0]["text"].strip()
+            if response.status_code == 200:
+                result = response.json()["content"][0]["text"].strip()
+                return result, "Claude 4.5 Sonnet"
+            else:
+                raise Exception(f"HTTP {response.status_code}")
         except Exception as e:
-            return f"[Claude Exception] {str(e)}"
+            return None, f"Claude Error: {str(e)}"
 
 
-# --- LanguageTool 도우미 함수 ---
-async def call_languagetool(text: str):
-    if not LANGUAGETOOL_USERNAME or not LANGUAGETOOL_API_KEY:
-         # Fallback to Gemini
-        return await call_claude(text, "당신은 LanguageTool처럼 작동합니다. 문체 스타일을 자연스럽고 전문적으로 다듬어주세요. 설명 없이 텍스트만 출력하세요.")
-
-    async with httpx.AsyncClient() as client:
+async def call_gemini(text: str, prompt: str) -> tuple[str, str]:
+    """Gemini API - Requires API key"""
+    if not GEMINI_API_KEY:
+        return None, "No Gemini API key"
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.post(
-                LANGUAGETOOL_URL,
-                data={"text": text, "language": "ko-KR", "username": LANGUAGETOOL_USERNAME, "apiKey": LANGUAGETOOL_API_KEY}
+                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+                json={
+                    "contents": [{"parts": [{"text": f"{prompt}\n\n{text}"}]}],
+                    "generationConfig": {"temperature": 0.1}
+                }
             )
-            if response.status_code != 200:
-                 raise Exception("LT API Error")
-            return f"[LT API Verified] {text}"
-        except Exception:
-            return await call_claude(text, "문체 스타일을 교정해주세요. 설명 없이 텍스트만 출력하세요.")
+            if response.status_code == 200:
+                result = response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return result, "Gemini 2.0 Flash"
+            else:
+                raise Exception(f"HTTP {response.status_code}")
+        except Exception as e:
+            return None, f"Gemini Error: {str(e)}"
 
 
-# --- 메인 라우터 ---
+async def process_with_ai(text: str, prompt: str) -> tuple[str, str]:
+    """Try multiple AI APIs with fallback"""
+    
+    # Try Claude first
+    result, api = await call_claude(text, prompt)
+    if result:
+        return result, api
+    
+    # Try Gemini
+    result, api = await call_gemini(text, prompt)
+    if result:
+        return result, api
+    
+    # Fallback: just return original text with message
+    return text, "No AI API available (add ANTHROPIC_API_KEY or GEMINI_API_KEY)"
+
+
+async def process_grammar(text: str) -> tuple[str, str]:
+    """Try grammar APIs with fallback"""
+    
+    # Try Trinka first (best for academic writing)
+    result, api = await call_trinka(text)
+    if result:
+        return result, api
+    
+    # Use FREE LanguageTool as fallback
+    result, api = await call_languagetool_free(text)
+    if result:
+        return result, api
+    
+    return text, "Grammar check unavailable"
+
+
+# ============================================================
+# Main API Router
+# ============================================================
+
+@app.get("/api/status")
+async def status():
+    """Check which APIs are available"""
+    return {
+        "trinka": bool(TRINKA_API_KEY),
+        "claude": bool(ANTHROPIC_API_KEY),
+        "gemini": bool(GEMINI_API_KEY),
+        "languagetool": True,  # Always available (free)
+    }
+
+
 @app.post("/api/process-text")
 async def process_text(request: ProcessTextRequest):
     step = request.step
     text = request.text
     result = text
     msg = ""
+    api_used = ""
     changes = []
     
-    # 언어 감지
+    # Detect language
     is_korean = any(ord('가') <= ord(char) <= ord('힣') for char in text)
 
-    if step == 1: # 문장 간소화 (Gemini 3.0 Pro)
+    if step == 1:  # Sentence Simplification
         if is_korean:
-            prompt = "당신은 전문 편집자입니다. 이 문장을 불필요한 수식어를 제거하여 간결하고 명확하게 다듬으세요. 의미는 유지하세요. 설명 없이 결과만 출력하세요."
+            prompt = "이 문장을 간결하고 명확하게 다듬으세요. 의미는 유지하세요."
         else:
-            prompt = """
-            You are an English textbook content expert with 30 years of experience.
-            Simplify the following sentences to make them clear and concise.
-            Keep the meaning 100% intact. Output ONLY the simplified text.
-            """
-        result = await call_claude(text, prompt)
-        msg = "문장 간소화 (GPT-4o)"
+            prompt = "Simplify this text to be clear and concise. Keep the meaning intact."
+        result, api_used = await process_with_ai(text, prompt)
+        msg = "문장 간소화"
 
-    elif step == 2: # 문법 교정
+    elif step == 2:  # Grammar Correction
+        result, api_used = await process_grammar(text)
+        msg = "문법 교정"
+
+    elif step == 3:  # Tone Adjustment
         if is_korean:
-            prompt = """
-            당신은 20년 경력의 한국어 교열 전문가입니다.
-            맞춤법, 띄어쓰기, 문법을 완벽하게 교정하세요.
-            오타가 없어야 합니다. 반드시 3번 검토하세요.
-            설명 없이 교정된 텍스트만 출력하세요.
-            """
-            msg = "문법 교정 (Claude 4.5 Sonnet)"
+            prompt = "이 텍스트를 희망차고 긍정적인 어조로 바꾸세요. 존댓말을 사용하세요."
         else:
-            prompt = """
-            You are an English editing expert with 30 years of experience.
-            Perfectly correct the grammar and punctuation.
-            It must be flawless. Output ONLY the corrected text without explanation.
-            """
-            msg = "문법 교정 (Claude 4.5 Sonnet)"
-        
-        result = await call_claude(text, prompt)
+            prompt = "Change the tone to be hopeful, positive, and encouraging."
+        result, api_used = await process_with_ai(text, prompt)
+        msg = "어조 조정"
 
-    elif step == 3: # 어조 조정
+    elif step == 4:  # Style Correction
+        result, api_used = await process_grammar(text)
+        msg = "스타일 교정"
+
+    elif step == 5:  # Sensitivity Check
+        prompt = "Review this text for bias or sensitive content. Correct if needed."
+        result, api_used = await process_with_ai(text, prompt)
+        msg = "민감성 검사"
+
+    elif step == 6:  # Final Review
         if is_korean:
-            prompt = "이 텍스트를 초중고생에게 적합한 '희망차고 긍정적인(Hopeful & Encouraging)' 어조로 바꾸세요. 존댓말을 사용하세요. 설명 없이 텍스트만 출력하세요."
+            prompt = "문장을 자연스럽고 유려한 한국어로 다듬으세요."
         else:
-            prompt = """
-            You are an educational content creator for students.
-            Change the tone to be 'Hopeful, Positive, and Encouraging'.
-            Make it inspiring for young learners. Output ONLY the text.
-            """
-        result = await call_claude(text, prompt)
-        msg = "어조 조정 (Claude 4.5 Sonnet)"
+            prompt = "Paraphrase this text to sound natural and fluent."
+        result, api_used = await process_with_ai(text, prompt)
+        msg = "최종 검토"
 
-    elif step == 4: # 스타일 교정
-        result = await call_languagetool(text)
-        msg = "스타일 교정 (LanguageTool)"
-
-    elif step == 5: # 민감성 검사
-        prompt = "Review this text for bias, offensive language, or sensitive content. Purify it if necessary. Output ONLY the text."
-        result = await call_claude(text, prompt)
-        msg = "민감성 검사 (Gemini 3.0 Pro)"
-
-    elif step == 6: # 최종 검토
-        if is_korean:
-            prompt = "문장을 가장 자연스럽고 유려한 한국어로 다듬으세요. 의미 왜곡 없이 세련되게 만드세요. 설명 없이 결과만 출력하세요."
-        else:
-            prompt = """
-            You are a veteran English textbook editor.
-            Paraphrase this text to make it sound as natural and fluent as a native speaker's writing.
-            Output ONLY the final text.
-            """
-        result = await call_claude(text, prompt)
-        msg = "최종 검토 (QuillBot)"
-
-    return ProcessTextResponse(result=result, step=step, message=msg, changes=changes)
+    return ProcessTextResponse(
+        result=result,
+        step=step,
+        message=msg,
+        changes=changes,
+        api_used=api_used
+    )
