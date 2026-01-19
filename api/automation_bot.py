@@ -365,7 +365,7 @@ async def run_5step_workflow(text: str, text_type: TextType = TextType.TYPE_A) -
     
     results.append(ReviewResult(
         step=3,
-        step_name="문장 재구성",
+        step_name="문맥/문장 검수",
         tool_used=tool,
         original_text=current_text,
         processed_text=paraphrased,

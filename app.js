@@ -10,7 +10,7 @@ class ToPlusEditor {
         this.stepData = {
             1: { name: '오류 제거', desc: '기본적인 문법 및 맞춤법 오류를 제거합니다.', api: 'LanguageTool' },
             2: { name: '레벨링 진단', desc: '학년 수준을 진단하고 난이도를 조정합니다.', api: 'Hemingway Editor' },
-            3: { name: '문장 재구성', desc: '문장을 더 자연스럽고 매끄럽게 재구성합니다.', api: 'QuillBot / Wordtune' },
+            3: { name: '문맥/문장 검수', desc: '문맥의 논리적 흐름과 문장 구조를 집중적으로 교정합니다.', api: 'QuillBot / Wordtune' },
             4: { name: '스타일 통일', desc: '문체와 스타일을 일관성 있게 통일합니다.', api: 'ProWritingAid' },
             5: { name: '재검수', desc: '13가지 체크포인트를 기준으로 최종 점검합니다.', api: '13-Point Check' }
         };

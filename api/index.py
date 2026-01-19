@@ -264,13 +264,13 @@ async def process_text(request: ProcessTextRequest):
         result, api_used = await process_with_ai(text, prompt)
         msg = "레벨링 진단"
 
-    elif step == 3:  # 문장 재구성 (QuillBot/Wordtune)
+    elif step == 3:  # 문맥/문장 검수 (Context Check)
         if is_korean:
-            prompt = "이 텍스트를 더 자연스럽고 매끄럽게 재구성하세요. (QuillBot Standard Mode). 한국어 문법에 맞게 문장 구조를 개선하세요."
+            prompt = "이 텍스트의 문맥과 논리적 흐름을 검토하고, 어색하거나 말이 안 되는 부분을 자연스럽게 고치세요. 문장 구조를 바로잡으세요."
         else:
-            prompt = "Paraphrase this text clearly and formally. Maintain all meaning. (QuillBot Standard)"
+            prompt = "Check the context and logical flow. Fix any awkward phrasing or nonsensical sentences. Ensure the structure is sound."
         result, api_used = await process_with_ai(text, prompt)
-        msg = "문장 재구성"
+        msg = "문맥/문장 검수"
 
     elif step == 4:  # 스타일 통일 (ProWritingAid)
         prompt = """Improve the style of this text (ProWritingAid):
