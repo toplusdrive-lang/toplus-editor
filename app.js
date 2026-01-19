@@ -601,6 +601,134 @@ class ToPlusEditor {
         return historyEntry;
     }
 
+    // Simple word-level diff
+    computeDiff(original, modified) {
+        if (!original || !modified) return '';
+
+        // Escape HTML to prevent XSS and rendering issues
+        const escapeHtml = (text) => {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        };
+
+        const oldWords = escapeHtml(original).split(/\s+/);
+        const newWords = escapeHtml(modified).split(/\s+/);
+        let result = '';
+
+        let i = 0, j = 0;
+
+        while (i < oldWords.length || j < newWords.length) {
+            if (i < oldWords.length && j < newWords.length && oldWords[i] === newWords[j]) {
+                result += oldWords[i] + ' ';
+                i++;
+                j++;
+            } else {
+                let foundSync = false;
+                const lookahead = 5;
+
+                for (let k = 1; k <= lookahead; k++) {
+                    if (i + k < oldWords.length && oldWords[i + k] === newWords[j]) {
+                        for (let x = 0; x < k; x++) {
+                            result += `<span class="diff-del">${oldWords[i + x]}</span> `;
+                        }
+                        i += k;
+                        foundSync = true;
+                        break;
+                    }
+                    if (j + k < newWords.length && oldWords[i] === newWords[j + k]) {
+                        for (let x = 0; x < k; x++) {
+                            result += `<span class="diff-add">${newWords[j + x]}</span> `;
+                        }
+                        j += k;
+                        foundSync = true;
+                        break;
+                    }
+                }
+
+                if (!foundSync) {
+                    if (i < oldWords.length) {
+                        result += `<span class="diff-del">${oldWords[i]}</span> `;
+                        i++;
+                    }
+                    if (j < newWords.length) {
+                        result += `<span class="diff-add">${newWords[j]}</span> `;
+                        j++;
+                    }
+                }
+            }
+        }
+        return result.trim();
+    }
+
+    showHistoryModal() {
+        const existing = document.getElementById('historyModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'historyModal';
+        modal.className = 'history-modal';
+        modal.innerHTML = `
+            <div class="history-modal-content">
+                <div class="history-modal-header">
+                    <h2>📋 검수 히스토리</h2>
+                    <div class="history-modal-actions">
+                        <button class="btn btn-small" onclick="app.exportToJSON()">📥 JSON</button>
+                        <button class="btn btn-small" onclick="app.exportToCSV()">📥 CSV</button>
+                        <button class="btn btn-small btn-danger" onclick="app.clearHistory()">🗑️ 전체 삭제</button>
+                        <button class="btn btn-small" onclick="document.getElementById('historyModal').remove()">✕ 닫기</button>
+                    </div>
+                </div>
+                <div class="history-list">
+                    ${this.reviewHistory.length === 0 ?
+                '<div class="empty-history">저장된 히스토리가 없습니다.</div>' :
+                this.reviewHistory.map(h => {
+                    const diffHtml = this.computeDiff(h.originalText, h.resultText);
+                    return `
+                            <div class="history-item" data-id="${h.id}">
+                                <div class="history-item-header">
+                                    <span class="history-date">${h.date} ${h.time}</span>
+                                    <span class="history-type">${h.type || '검수'}</span>
+                                </div>
+                                <div class="history-item-body">
+                                    <div class="history-text-pair">
+                                        <div class="history-original">
+                                            <strong>원본:</strong>
+                                            <p>${(h.originalText || '').substring(0, 200)}${(h.originalText || '').length > 200 ? '...' : ''}</p>
+                                        </div>
+                                        <div class="history-arrow">→</div>
+                                        <div class="history-result">
+                                            <strong>결과:</strong>
+                                            <p>${(h.resultText || '').substring(0, 200)}${(h.resultText || '').length > 200 ? '...' : ''}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="history-diff-view">
+                                        <h4>🔍 상세 비교 (교정 표식)</h4>
+                                        <div class="diff-content">${diffHtml}</div>
+                                    </div>
+
+                                    ${h.toolsUsed ? `<div class="history-tools">🔧 ${h.toolsUsed}</div>` : ''}
+                                    ${h.changes && h.changes.length > 0 ? `
+                                        <div class="history-changes">
+                                            <strong>변경 사항:</strong>
+                                            <ul>${h.changes.slice(0, 5).map(c => `<li>${c}</li>`).join('')}</ul>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `}).join('')
+            }
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
     async saveToServer(record) {
         try {
             await fetch('/api/save-history', {
