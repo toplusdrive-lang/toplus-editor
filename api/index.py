@@ -6,6 +6,9 @@ import os
 import httpx
 import json
 
+# Mangum is required for FastAPI to work on Vercel serverless
+from mangum import Mangum
+
 app = FastAPI()
 
 app.add_middleware(
@@ -16,10 +19,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Export handler for Vercel serverless functions
+handler = Mangum(app, lifespan="off")
+
 # --- API Keys ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")  # Anthropic Claude
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenAI GPT
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")  # Anthropic Claude
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("openai_api_key")  # OpenAI GPT
 LANGUAGETOOL_USERNAME = os.getenv("LANGUAGETOOL_USERNAME")
 LANGUAGETOOL_API_KEY = os.getenv("LANGUAGETOOL_API_KEY")
 
