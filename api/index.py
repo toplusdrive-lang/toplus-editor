@@ -83,7 +83,8 @@ You are a strict text processing engine.
 # --- Claude API ---
 async def call_claude(text: str, prompt: str):
     if not CLAUDE_API_KEY:
-        return await call_gemini(text, prompt)
+        # Return original text when API key is missing
+        return text
     
     full_prompt = f"{prompt}\n\n{text}"
     
@@ -106,14 +107,17 @@ async def call_claude(text: str, prompt: str):
             if response.status_code == 200:
                 return response.json()["content"][0]["text"].strip()
             else:
-                return await call_gemini(text, prompt)
+                # Return original text on API error
+                return text
         except Exception as e:
-            return await call_gemini(text, prompt)
+            # Return original text on exception
+            return text
 
 # --- OpenAI GPT API ---
 async def call_gpt(text: str, prompt: str):
     if not OPENAI_API_KEY:
-        return await call_gemini(text, prompt)
+        # Return original text when API key is missing
+        return text
     
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
@@ -135,15 +139,17 @@ async def call_gpt(text: str, prompt: str):
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"].strip()
             else:
-                return await call_gemini(text, prompt)
+                # Return original text on API error
+                return text
         except Exception as e:
-            return await call_gemini(text, prompt)
+            # Return original text on exception
+            return text
 
 # --- Gemini API ---
 async def call_gemini(text: str, prompt: str):
     if not GEMINI_API_KEY:
-        # Return text as-is with a note when API key is not configured
-        return text + "\n\n[Note: AI processing unavailable - API key not configured]"
+        # Return original text when API key is missing
+        return text
     
     full_prompt = f"{SYSTEM_INSTRUCTION}\n\n[INSTRUCTION]\n{prompt}\n\n[INPUT TEXT]\n{text}"
 
