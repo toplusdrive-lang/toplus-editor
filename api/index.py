@@ -142,7 +142,8 @@ async def call_gpt(text: str, prompt: str):
 # --- Gemini API ---
 async def call_gemini(text: str, prompt: str):
     if not GEMINI_API_KEY:
-        return f"[Mock] API Key missing"
+        # Return text as-is with a note when API key is not configured
+        return text + "\n\n[Note: AI processing unavailable - API key not configured]"
     
     full_prompt = f"{SYSTEM_INSTRUCTION}\n\n[INSTRUCTION]\n{prompt}\n\n[INPUT TEXT]\n{text}"
 
@@ -158,10 +159,12 @@ async def call_gemini(text: str, prompt: str):
             if response.status_code != 200:
                 if response.status_code == 404:
                     return await call_gemini_fallback(text, prompt)
-                return f"[Gemini Error {response.status_code}]"
+                # Return original text on error
+                return text
             return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
-            return f"[Gemini Exception] {str(e)}"
+            # Return original text on exception
+            return text
 
 # --- Gemini Fallback ---
 async def call_gemini_fallback(text: str, prompt: str):
@@ -174,9 +177,9 @@ async def call_gemini_fallback(text: str, prompt: str):
             )
             if response.status_code == 200:
                 return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            return "[Gemini Fallback Error]"
+            return text
         except:
-            return "API Error"
+            return text
 
 # --- LanguageTool API ---
 async def call_languagetool(text: str):
@@ -204,9 +207,11 @@ async def call_languagetool(text: str):
                 
                 return corrected_text
             else:
-                return await call_gemini(text, "Fix grammar and spelling. Output only the text.")
+                # Return original text if LanguageTool request fails
+                return text
         except Exception:
-            return await call_gemini(text, "Fix grammar and spelling. Output only the text.")
+            # Return original text on exception
+            return text
 
 
 # --- Main Router ---
