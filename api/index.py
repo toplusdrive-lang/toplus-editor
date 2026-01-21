@@ -55,6 +55,21 @@ class ProcessTextResponse(BaseModel):
 class ProcessTextRequest(BaseModel):
     text: str
     step: int
+    textType: Optional[str] = "A"
+    targetGrade: Optional[str] = "M1"
+
+class DiagnoseRequest(BaseModel):
+    text: str
+    textType: str = "A"
+    targetGrade: str = "M1"
+
+class DiagnoseResponse(BaseModel):
+    readability: int
+    grammar: int
+    tone: int
+    sensitivity: int
+    suggestions: Optional[List[ChangeItem]] = []
+    message: str
 
 # --- System Instructions ---
 SYSTEM_INSTRUCTION = """[SYSTEM]
@@ -246,6 +261,85 @@ async def process_text(request: ProcessTextRequest):
         metrics.tone = "Perfect"
 
     return ProcessTextResponse(result=result, step=step, message=msg, changes=changes, metrics=metrics)
+
+
+@app.post("/api/diagnose")
+async def diagnose_text(request: DiagnoseRequest):
+    text = request.text
+    text_type = request.textType
+    target_grade = request.targetGrade
+    
+    # Check if Korean text
+    is_korean = any(ord('가') <= ord(char) <= ord('힣') for char in text)
+    
+    # Run LanguageTool for grammar check
+    grammar_errors = 0
+    suggestions = []
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            data = {"text": text, "language": "auto"}
+            if LANGUAGETOOL_USERNAME and LANGUAGETOOL_API_KEY:
+                data["username"] = LANGUAGETOOL_USERNAME
+                data["apiKey"] = LANGUAGETOOL_API_KEY
+            
+            response = await client.post(LANGUAGETOOL_URL, data=data)
+            if response.status_code == 200:
+                result = response.json()
+                matches = result.get("matches", [])
+                grammar_errors = len(matches)
+                
+                # Extract suggestions
+                for match in matches[:5]:  # Limit to 5 suggestions
+                    if match.get("replacements"):
+                        original = text[match["offset"]:match["offset"] + match["length"]]
+                        corrected = match["replacements"][0]["value"]
+                        reason = match.get("message", "Grammar issue")
+                        suggestions.append(ChangeItem(
+                            original=original,
+                            corrected=corrected,
+                            reason=reason
+                        ))
+    except Exception as e:
+        pass  # Continue even if LanguageTool fails
+    
+    # Calculate scores
+    grammar_score = max(0, 100 - (grammar_errors * 5))  # -5 points per error
+    
+    # Calculate readability (simple heuristic)
+    words = text.split()
+    avg_word_length = sum(len(w) for w in words) / len(words) if words else 0
+    readability_score = min(100, max(0, 100 - int((avg_word_length - 5) * 10)))
+    
+    # Tone analysis using Gemini
+    tone_score = 85
+    sensitivity_score = 100
+    
+    if GEMINI_API_KEY:
+        try:
+            tone_prompt = "Analyze the tone of this text. Rate it from 0-100 for appropriateness for students. Output only the number."
+            if is_korean:
+                tone_prompt = "이 텍스트의 어조를 분석하세요. 학생에게 적합한 정도를 0-100으로 평가하세요. 숫자만 출력하세요."
+            
+            tone_result = await call_gemini(text, tone_prompt)
+            try:
+                tone_score = int(''.join(filter(str.isdigit, tone_result[:3])))
+                tone_score = max(0, min(100, tone_score))
+            except:
+                tone_score = 85
+        except:
+            pass
+    
+    message = f"진단 완료: 문법 {grammar_score}%, 가독성 {readability_score}%, 어조 {tone_score}%"
+    
+    return DiagnoseResponse(
+        readability=readability_score,
+        grammar=grammar_score,
+        tone=tone_score,
+        sensitivity=sensitivity_score,
+        suggestions=suggestions,
+        message=message
+    )
 
 
 @app.get("/api/health")
